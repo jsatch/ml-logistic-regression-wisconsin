@@ -15,3 +15,14 @@ URL: http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+(Original)
 8. Normal Nucleoli (1-10)
 9. Mitoses (1-10)
 10. Class (2 beningno, 4 maligno)
+
+
+Resultados:
+
+areaUnderROC:0.985808613383266
+areaUnderPR:0.9706106910128027
+Transcurrio:8.377838611602783
+
+areaUnderROC:0.9855129594954174
+areaUnderPR:0.9704734929408751
+Transcurrio:35.87102437019348

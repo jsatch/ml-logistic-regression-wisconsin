@@ -1,8 +1,10 @@
+import time
 from pyspark import SparkConf, SparkContext
 from pyspark.sql import SparkSession
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 
 def init():
     conf = SparkConf().setAppName("WisconsinCancer").setMaster("local")
@@ -45,25 +47,50 @@ def prepare_dataset(data):
 
     return train_data,test_data
 
+def encontrar_modelo_usando_cross_validation(data):
+    lr = LogisticRegression(
+        maxIter=100,
+        labelCol='CLASS', family='binomial')
+
+    paramGrid = ParamGridBuilder() \
+        .addGrid(lr.regParam, [0.1, 0.01]) \
+        .addGrid(lr.elasticNetParam, [0.1, 0.01]) \
+        .build()
+    
+    crossVal = CrossValidator(estimator=lr,
+        estimatorParamMaps=paramGrid,
+        evaluator=BinaryClassificationEvaluator(
+            labelCol='CLASS', 
+            metricName='areaUnderPR', 
+            rawPredictionCol='rawPrediction'
+        ),
+        numFolds=4
+    )
+    return crossVal.fit(data)
+
+def buscar_modelo(data):
+    lr = LogisticRegression(
+        maxIter=100, regParam=0.1, elasticNetParam=0.3,
+        labelCol='CLASS', family='binomial')
+    return lr.fit(data)
+
+
 def main():
     sc = init()
     spark = SparkSession(sc)
     data = load_dataset(spark)
 
+    tiempo_inicio = time.time()
+
     train_data, test_data = prepare_dataset(data)
-    #train_data.show()
-    #test_data.show()
 
     print("Encontrando h ....")
 
-    lr = LogisticRegression(
-        maxIter=100, regParam=0.3, elasticNetParam=0.8,
-        labelCol='CLASS', family='binomial')
-    
-    lr_model = lr.fit(train_data)
+    lr_model = encontrar_modelo_usando_cross_validation(train_data)    
+    #lr_model = buscar_modelo(train_data)
 
-    print("Coeficientes: " + str(lr_model.coefficients))
-    print("Intercept: " + str(lr_model.intercept))
+    #print("Coeficientes: " + str(lr_model.coefficients))
+    #print("Intercept: " + str(lr_model.intercept))
 
     print("Testing model...")
 
@@ -82,6 +109,9 @@ def main():
     )
     print("{}:{}".format(
         "areaUnderPR",evaluator2.evaluate(data_to_validate)))
+
+    tiempo_transcurrido = time.time() - tiempo_inicio
+    print("Transcurrio:{}".format(tiempo_transcurrido))
 
 if __name__ == '__main__':
     main()
