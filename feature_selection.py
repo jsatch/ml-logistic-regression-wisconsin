@@ -5,6 +5,7 @@ from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+from pyspark.ml.feature import ChiSqSelector
 
 def init():
     conf = SparkConf().setAppName("WisconsinCancer").setMaster("local")
@@ -30,6 +31,12 @@ def load_dataset(spark):
         "CLASS"]
     return spark.createDataFrame(rdd_data, headers)
 
+def feature_analisis(data):
+    selector = ChiSqSelector(
+        numTopFeatures=5, featuresCol="features",
+        outputCol="selectedFeatures", labelCol="CLASS")
+    return selector.fit(data).transform(data)
+
 def prepare_dataset(data):
     train, test = data.randomSplit(
         [0.7, 0.3], seed=12345
@@ -47,33 +54,6 @@ def prepare_dataset(data):
 
     return train_data,test_data
 
-def encontrar_modelo_usando_cross_validation(data):
-    lr = LogisticRegression(
-        maxIter=100,
-        labelCol='CLASS', family='binomial')
-
-    paramGrid = ParamGridBuilder() \
-        .addGrid(lr.regParam, [0.1, 0.01]) \
-        .addGrid(lr.elasticNetParam, [0.1, 0.01]) \
-        .build()
-    
-    crossVal = CrossValidator(estimator=lr,
-        estimatorParamMaps=paramGrid,
-        evaluator=BinaryClassificationEvaluator(
-            labelCol='CLASS', 
-            metricName='areaUnderPR', 
-            rawPredictionCol='rawPrediction'
-        ),
-        numFolds=4
-    )
-    return crossVal.fit(data)
-
-def buscar_modelo(data):
-    lr = LogisticRegression(
-        maxIter=100, regParam=0.1, elasticNetParam=0.3,
-        labelCol='CLASS', family='binomial')
-    return lr.fit(data)
-
 def main():
     sc = init()
     spark = SparkSession(sc)
@@ -83,31 +63,8 @@ def main():
 
     train_data, test_data = prepare_dataset(data)
 
-    print("Encontrando h ....")
-
-    lr_model = encontrar_modelo_usando_cross_validation(train_data)    
-    #lr_model = buscar_modelo(train_data)
-
-    print("Testing model...")
-
-    data_to_validate = lr_model.transform(test_data)
-    
-    evaluator1 = BinaryClassificationEvaluator(
-        labelCol='CLASS', metricName='areaUnderROC', 
-        rawPredictionCol='rawPrediction'
-    )
-    print("{}:{}".format(
-        "areaUnderROC",evaluator1.evaluate(data_to_validate)))
-
-    evaluator2 = BinaryClassificationEvaluator(
-        labelCol='CLASS', metricName='areaUnderPR', 
-        rawPredictionCol='rawPrediction'
-    )
-    print("{}:{}".format(
-        "areaUnderPR",evaluator2.evaluate(data_to_validate)))
-
-    tiempo_transcurrido = time.time() - tiempo_inicio
-    print("Transcurrio:{}".format(tiempo_transcurrido))
+    data_analisis = feature_analisis(train_data)
+    data_analisis.show()
 
 if __name__ == '__main__':
     main()
